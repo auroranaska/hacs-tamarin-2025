@@ -1,4 +1,4 @@
-## Exercise 1: Signed Diffie-Hellman
+## Protocol: Signed Diffie-Hellman
 
 
 The server generates a private-public long-term key pair `(s_sk, s_pk)`. The public key is known to the network and all clients.
