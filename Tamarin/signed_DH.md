@@ -7,7 +7,7 @@ The server generates a private-public long-term key pair `(s_sk, s_pk)`. The pub
 - The server generates their own public-private keypair, signs the two public shares with the private long-term key, and calculates the session key `k_S`.
 - Client verifies the signature, and calculates their session key `k_C`.
 
-![Protocol 2](./signed_DH.png)
+![Protocol 2](./Figures/signed_DH.png)
 
 
 #### Useful Tamarin built-ins theory for common operators:
@@ -55,7 +55,7 @@ protocol with the same parameters.
 
 * Add the following two action facts to the approriate server and client rules:
 
-  * `ServerAccepts($S, x_pk, y_pk, s_pk, k_s)`: Indicates that at this point the server ($S) has accepted a session established with paramters `x_pk, y_pk` and session key `k_s`.
-  * `ClientAccepts($S, x_pk, y_pk, s_pk, k_c)`: Indicates that at this point the client ($S) has accepted a session established with paramters `x_pk, y_pk` and session key `k_s`.
+  * `ServerAccepts($S, x_pk, y_pk, s_pk, sig, k_s)`: Indicates that at this point the server ($S) has accepted a session established with paramters `x_pk, y_pk` and session key `k_s`.
+  * `ClientAccepts($S, x_pk, y_pk, s_pk, sig, k_c)`: Indicates that at this point the client ($S) has accepted a session established with paramters `x_pk, y_pk` and session key `k_s`.
 
 * Write `lemma ServerAuthentication` checking that if the client accepts it implies that a server has accepted before. Verify the lemma.  

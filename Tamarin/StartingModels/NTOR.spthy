@@ -1,7 +1,8 @@
-theory SignedDH
+theory NTOR
 begin
 
-builtins: hashing, diffie-hellman, signing
+builtins: diffie-hellman
+functions: hash1/5, hash2/2
 
 /* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
 matched by the variables x and y are the same. The modeler can then add an Eq action to 
@@ -10,14 +11,12 @@ any rule where such an equality is desired, e.g., check that signature verificat
 restriction Eq:
   "All x y #i. Eq(x, y) @ #i ==> x = y"
 
-// Generate Server's Long-Term Keys (s_sk, s_pk)
 rule generate_serverLtk:
   [ ... ]
   -->
   [ ...
     Out(s_pk) ]
 
-// Client generates DH pair, and sends public key
 rule Client_Init:
   let 
     ...
@@ -26,11 +25,6 @@ rule Client_Init:
   --[ ClientInitMessage()]->
   [ ... ]
 
-/**Server generates their own DH pair (y_sk, y_pk),
-  sign the public keys of client and server,
-  calculates the session key, and
-  send the public key and signature to client.
-**/
 rule Server_Init:
   let 
     ...
@@ -46,7 +40,8 @@ rule Client_Accepts:
     ...
   in
   [ ... ]
-  --[ ... ]->
+  --[ ClientRecvMessage(),
+      ... ]->
   [ ... ]
 
 // Sanity Traces to check executability of the model
@@ -58,6 +53,10 @@ lemma ExecutabilityServer:
   exists-trace
   "Ex #i. ServerInitMessage() @ #i"
 
+lemma ExecutabilityClientEnd:
+  exists-trace
+  "Ex #i. ClientRecvMessage() @ #i"
+
 // Secrecy of established session key
 lemma ServerKeySecrecy:
   "All ..."
@@ -68,6 +67,5 @@ lemma ClientKeySecrecy:
 // Server Authentication at the end of the protocol
 lemma ServerAuthentication:
   "All ... "
-
 
 end

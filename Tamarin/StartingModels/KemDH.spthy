@@ -1,0 +1,73 @@
+
+theory KemDH
+begin
+
+builtins: diffie-hellman, signing, asymmetric-encryption
+functions: h/2
+
+/* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
+matched by the variables x and y are the same. The modeler can then add an Eq action to 
+any rule where such an equality is desired, e.g., check that signature verification succeeds.
+*/
+restriction Eq:
+  "All x y #i. Eq(x, y) @ #i ==> x = y"
+
+rule generate_serverLtk:
+  [ ... ]
+  -->
+  [ ...
+    Out(s_pk) ]
+
+rule Client_Init:
+  let 
+    ...
+  in
+  [ ... ]
+  --[ ClientInitMessage()]->
+  [ ... ]
+
+rule Server_Init:
+  let 
+    ...
+  in
+  [ ... ]
+  --[ ServerInitMessage(),
+    ...
+    ]->
+  [ ... ]
+
+rule Client_Accepts:
+  let
+    ...
+  in
+  [ ... ]
+  --[ ClientRecvMessage(),
+      ... ]->
+  [ ... ]
+
+// Sanity Traces to check executability of the model
+lemma ExecutabilityClient:
+  exists-trace
+  "Ex #i. ClientInitMessage() @ #i"
+
+lemma ExecutabilityServer:
+  exists-trace
+  "Ex #i. ServerInitMessage() @ #i"
+
+lemma ExecutabilityClientEnd:
+  exists-trace
+  "Ex #i. ClientRecvMessage() @ #i"
+
+// Secrecy of established session key
+lemma ServerKeySecrecy:
+  "All ..."
+
+lemma ClientKeySecrecy:
+  "All ..."
+
+// Server Authentication at the end of the protocol
+lemma ServerAuthentication:
+  "All ... "
+
+
+end
