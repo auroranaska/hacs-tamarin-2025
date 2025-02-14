@@ -1,7 +1,9 @@
-theory SignedDH
+
+theory KemDH
 begin
 
-builtins: hashing, diffie-hellman, signing
+builtins: diffie-hellman, signing, asymmetric-encryption
+functions: h/2
 
 /* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
 matched by the variables x and y are the same. The modeler can then add an Eq action to 
@@ -20,13 +22,15 @@ rule generate_serverLtk:
     !Pk($S, pkS), 
     Out(pkS) ]
 
-// Client generates DH pair, and sends public key
+// Client generates DH pair, Kem, and sends public keys
 rule Client_Init:
   let x_pk = 'g'^~x_sk
+      z_pk = pk(~z_sk)
   in
-  [ Fr(~x_sk)]
+  [ Fr(~x_sk),
+    Fr(~z_sk)]
   --[ ClientInitMessage()]->
-  [ Out(<x_pk>), StateC($C, ~x_sk) ]
+  [ Out(<x_pk, z_pk>), StateC($C, ~x_sk, ~z_sk) ]
 
 /*Server generates their own DH pair (y_sk, y_pk),
   sign the public keys of client and server,
@@ -36,33 +40,38 @@ rule Client_Init:
 rule Server_Init:
   let 
     y_pk = 'g'^~y_sk 
-    serverSign = sign(<x_pk, y_pk>, ~s_sk)
+    ct = aenc(~ss, z_pk)
+    serverSign = sign(<x_pk, y_pk, z_pk, ct>, ~s_sk)
     dh_output = x_pk^~y_sk
-    k_s = h(dh_output)
-    m = <y_pk, serverSign>
+    k_s = h(dh_output, ~ss)
+    m = <y_pk, serverSign, ct>
   in
   [ !Ltk($S, ~s_sk), 
-    Fr(~y_sk)
-  , In(x_pk) ]
+    Fr(~y_sk),
+    Fr(~ss),
+    In(<x_pk, z_pk>) ]
   --[ ServerInitMessage(),
-      ServerAccepts($S, x_pk, y_pk, pk(~s_sk), serverSign, k_s),
+      ServerAccepts($S, x_pk, z_pk, y_pk, ct, serverSign, pk(~s_sk), k_s),
       SecretServer(k_s) ]->
   [ Out(m) ]
 
 rule Client_Accepts:
   let
-    m = <y_pk, serverSign>
+    m = <y_pk, serverSign, ct>
     x_pk = 'g'^~x_sk
+    z_pk = pk(~z_sk)
+    
+    ss = adec(ct, ~z_sk)
     dh_output = y_pk^~x_sk
-    k_c = h(dh_output)
+    k_c = h(dh_output, ss)
   in
-  [ StateC($C, ~x_sk),
+  [ StateC($C, ~x_sk, ~z_sk),
     !Pk($S, s_pk),
     In(m) ]
-  --[  Eq(verify(serverSign, <x_pk, y_pk>, s_pk), true),
-      ClientAccepts($S, x_pk, y_pk, s_pk, serverSign, k_c),
+  --[  Eq(verify(serverSign, <x_pk, y_pk, z_pk, ct>, s_pk), true),
+      ClientAccepts($S, x_pk, z_pk, y_pk, ct, serverSign, s_pk, k_c),
       SecretClient(k_c),
-      ClientRecvMessage()]->
+      ClientRecvMessage() ]->
   [ ]
 
 // Sanity Traces to check executability of the model
@@ -80,10 +89,9 @@ lemma ExecutabilityClientEnd:
 
 lemma BothPartiesCanReachEnd:
   exists-trace
-  "Ex S x_pk y_pk s_pk serverSign key #i #j. i < j &
-     ServerAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #i &
-   ClientAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #j "
-
+  "Ex S x_pk z_pk y_pk ct sig s_pk key #i #j. i < j &
+     ServerAccepts(S, x_pk, z_pk, y_pk, ct, sig, s_pk, key) @ #i &
+   ClientAccepts(S, x_pk, z_pk, y_pk, ct, sig, s_pk, key) @ #j "
 
 // Secrecy of established session key
 // Does not hold. (The client could have been an attacker, therefore it knows the established key.)
@@ -96,8 +104,8 @@ lemma ClientKeySecrecy:
 
 // Server Authentication at the end of the protocol
 lemma ServerAuthentication:
-  "All S x_pk y_pk s_pk serverSign key #i. 
-   ClientAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #i 
-   ==>  Ex #j. j<i & ServerAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #j"
+  "All S x_pk z_pk y_pk ct sig s_pk key #i. 
+   ClientAccepts(S, x_pk, z_pk, y_pk, ct, sig, s_pk, key) @ #i 
+   ==>  Ex #j. j<i & ServerAccepts(S, x_pk, z_pk, y_pk, ct, sig, s_pk, key) @ #j"
 
 end
