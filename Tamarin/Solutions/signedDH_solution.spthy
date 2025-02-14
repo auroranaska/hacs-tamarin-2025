@@ -1,0 +1,91 @@
+theory SignedDH
+begin
+
+builtins: hashing, diffie-hellman, signing
+
+/* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
+matched by the variables x and y are the same. The modeler can then add an Eq action to 
+any rule where such an equality is desired, e.g., check that signature verification succeeds.
+*/
+restriction Eq:
+  "All x y #i. Eq(x, y) @ #i ==> x = y"
+
+// Generate Server's long-term (s_sk, s_pk)
+rule generate_serverLtk:
+  let pkS = pk(~sk) 
+  in
+  [ Fr(~sk) ]
+  -->
+  [ !Ltk($S, ~sk), 
+    !Pk($S, pkS), 
+    Out(pkS) ]
+
+// Client generates DH pair, and sends public key
+rule Client_Init:
+  let x_pk = 'g'^~x_sk
+  in
+  [ Fr(~x_sk)]
+  --[ ClientInitMessage(x_pk)]->
+  [ Out(<x_pk>), StateC($C, ~x_sk) ]
+
+/*Server generates their own DH pair (y_sk, y_pk),
+  sign the public keys of client and server,
+  calculates the session key, and
+  send the public key and signature to client.
+*/
+rule Server_Init:
+  let 
+    y_pk = 'g'^~y_sk 
+    serverSign = sign(<x_pk, y_pk>, ~s_sk)
+    dh_output = x_pk^~y_sk
+    k_s = h(dh_output)
+    m = <y_pk, serverSign>
+  in
+  [ !Ltk($S, ~s_sk), 
+    Fr(~y_sk)
+  , In(x_pk) ]
+  --[ ServerInitMessage(m),
+      ServerAccepts($S, x_pk, y_pk, pk(~s_sk), k_s),
+      SecretServer(k_s) ]->
+  [ Out(m) ]
+
+rule Client_Accepts:
+  let
+    m = <y_pk, serverSign>
+    x_pk = 'g'^~x_sk
+    dh_output = y_pk^~x_sk
+    k_c = h(dh_output)
+  in
+  [ StateC($C, ~x_sk),
+    !Pk($S, s_pk),
+    In(m) ]
+  --[  Eq(verify(serverSign, <x_pk, y_pk>, s_pk), true),
+      ClientAccepts($S, x_pk, y_pk, s_pk, k_c)
+    , SecretClient(k_c) ]->
+  [ ]
+
+// Sanity Traces to check executability of the model
+lemma ExecutabilityClient:
+  exists-trace
+  "Ex m #i. ClientInitMessage(m) @ #i"
+
+lemma ExecutabilityServer:
+  exists-trace
+  "Ex m #i. ServerInitMessage(m) @ #i"
+
+// Secrecy of established session key
+// Does not hold. (The client could have been an attacker, therefore it knows the established key.)
+lemma ServerKeySecrecy:
+  "All key #i. SecretServer(key) @ #i ==> not Ex #j. K(key) @ #j"
+
+// Verifies True.
+lemma ClientKeySecrecy:
+  "All key #i. SecretClient(key) @ #i ==> not Ex #j. K(key) @ #j"
+
+// Server Authentication at the end of the protocol
+lemma ServerAuthentication:
+  "All S x_pk y_pk s_pk key #i. 
+   ClientAccepts(S, x_pk, y_pk, s_pk, key) @ #i 
+   ==>  Ex #j. j<i & ServerAccepts(S, x_pk, y_pk, s_pk, key) @ #j"
+
+end
