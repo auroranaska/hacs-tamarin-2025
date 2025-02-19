@@ -46,7 +46,7 @@ rule Server_Init:
   , In(x_pk) ]
   --[ ServerInitMessage(),
       ServerAccepts($S, x_pk, y_pk, pk(~s_sk), serverSign, k_s),
-      SecretServer(k_s) ]->
+      SecretServer($S, k_s) ]->
   [ Out(m) ]
 
 rule Client_Accepts:
@@ -61,9 +61,15 @@ rule Client_Accepts:
     In(m) ]
   --[  Eq(verify(serverSign, <x_pk, y_pk>, s_pk), true),
       ClientAccepts($S, x_pk, y_pk, s_pk, serverSign, k_c),
-      SecretClient(k_c),
+      SecretClient($S, k_c),
       ClientRecvMessage()]->
   [ ]
+
+//Attacker learns the server's long-term key
+rule Reveal_LTK:
+  [ !Ltk($S, ~sk)]
+  --[RevealLtk($S, ~sk)]->
+  [ Out(~sk) ]
 
 // Sanity Traces to check executability of the model
 lemma ExecutabilityClient:
@@ -88,16 +94,23 @@ lemma BothPartiesCanReachEnd:
 // Secrecy of established session key
 // Does not hold. (The client could have been an attacker, therefore it knows the established key.)
 lemma ServerKeySecrecy:
-  "All key #i. SecretServer(key) @ #i ==> not Ex #j. K(key) @ #j"
+  "All S key #i. SecretServer(S, key) @ #i 
+    ==> 
+        (not Ex #j. K(key) @ #j)
+      | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
 
 // Verifies True.
 lemma ClientKeySecrecy:
-  "All key #i. SecretClient(key) @ #i ==> not Ex #j. K(key) @ #j"
+  "All S key #i. SecretClient(S, key) @ #i 
+  ==> 
+      (not Ex #j. K(key) @ #j)
+    | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
 
 // Server Authentication at the end of the protocol
 lemma ServerAuthentication:
   "All S x_pk y_pk s_pk serverSign key #i. 
    ClientAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #i 
-   ==>  Ex #j. j<i & ServerAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #j"
+   ==>  (Ex #j. j<i & ServerAccepts(S, x_pk, y_pk, s_pk, serverSign, key) @ #j)
+      | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
 
 end
