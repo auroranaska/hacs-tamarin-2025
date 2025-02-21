@@ -1,0 +1,123 @@
+
+theory KemDH_UKS
+begin
+
+builtins: diffie-hellman, signing, asymmetric-encryption
+functions: h/2
+
+/* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
+matched by the variables x and y are the same. The modeler can then add an Eq action to 
+any rule where such an equality is desired, e.g., check that signature verification succeeds.
+*/
+restriction Eq:
+  "All x y #i. Eq(x, y) @ #i ==> x = y"
+
+restriction Neq:
+  "All x y #i. Neq(x, y) @ #i ==> not(x = y)"
+// Generate Server's long-term (s_sk, s_pk)
+rule generate_Ltk:
+  let pkS = pk(~sk) 
+  in
+  [ Fr(~sk) ]
+  --[HonestParty(~sk, pk(~sk))]->
+  [ !Ltk($S, ~sk), 
+    !Pk($S, pkS), 
+    Out(pkS) ]
+
+// Client generates DH pair, Kem, and sends public keys
+rule Client_Init:
+  let x_pk = pk(~x_sk)
+      ct1 = aenc(~ss1, pkS)
+      sig = sign(x_pk, ~c_sk)
+  in
+  [ Fr(~x_sk),
+    Fr(~ss1),
+    !Ltk($C, ~c_sk),
+    In(pkS)]
+  --[ ClientInitMessage(),
+      Neq($C, $S)]->
+  [ Out(<x_pk, sig, ct1>), StateC(~x_sk, ~c_sk, ~ss1, $C, $S, pkS) ]
+
+rule Server_Init:
+  let in_m = <x_pk, sig, ct1>
+   ss1 = adec(ct1, ~s_sk)
+   ct2 = aenc(~ss2, x_pk)
+
+   K_S = h(ss1, ~ss2)
+    
+  in
+  [ Fr(~ss2),
+    In(in_m),
+    !Ltk($S, ~s_sk),
+    !Pk($C, pkC) ]
+  --[ ServerInitMessage(),
+      Eq(verify(sig, x_pk, pkC), true),
+      Neq($C, $S),
+     // ServerAccepts($S, x_pk, z_pk, y_pk, ct, serverSign, pk(~s_sk), k_s),
+      SecretServer(K_S, x_pk, pkC, pk(~s_sk)) ]->
+  [ Out(ct2) ]
+
+rule Client_Accepts:
+  let
+    ss2 = adec(ct2, ~x_sk)
+    K_C = h(~ss1, ss2)
+  in
+  [ StateC(~x_sk, ~c_sk, ~ss1, $C, $S, pkS),
+    In(ct2) ]
+  --[ SecretClientAll(K_C, ~x_sk, ~ss1, ss2, pk(~c_sk), pkS),
+      SecretClient(K_C, pk(~x_sk), pk(~c_sk), pkS),
+      ClientRecvMessage() ]->
+  [ ]
+
+#ifdef attacker
+//Attacker learns the server's long-term key
+rule Reveal_LTK:
+  [ !Ltk($S, ~sk)]
+  --[Compromise_LTK(~sk, pk(~sk))]->
+  [ Out(~sk) ]
+
+rule Reveal_KEMKey:
+  [ StateC(~x_sk, ~c_sk, ~ss1, $C, $S, pkS)]
+  --[Compromise_KEMKey(~x_sk)]->
+  [ Out(~x_sk) ]
+
+#endif
+
+// Sanity Traces to check executability of the model
+lemma ExecutabilityClient:
+  exists-trace
+  "Ex #i. ClientInitMessage() @ #i"
+
+lemma ExecutabilityServer:
+  exists-trace
+  "Ex #i. ServerInitMessage() @ #i"
+
+lemma ExecutabilityClientEnd:
+  exists-trace
+  "Ex #i. ClientRecvMessage() @ #i"
+
+
+// UKC
+lemma UKC:
+  "All key x_pk pkC1 pkC2 pkS1 pkS2 #i #j . 
+    SecretServer(key, x_pk, pkC1, pkS1) @ #i &
+    SecretClient(key, x_pk, pkC2, pkS2) @ #j
+   ==>  (pkC1=pkC2) & (pkS1 = pkS2)
+     "
+
+#ifdef attacker
+
+lemma reancanpsulation_against_session_independence:
+  "All key x_sk x_pk ss1 ss2 pkC pkS s_sk #i #j #k #k2. 
+     SecretClientAll(key, x_sk, ss1, ss2, pkC, pkS) @ #i &
+     SecretServer(key, x_pk, pkC, pkS) @ #j & 
+     K(ss2) @ #k &
+     HonestParty(s_sk, pkS) @ #k2 &
+     not(Ex #l. Compromise_LTK(s_sk, pkS)@ #l) 
+   ==> Ex c_sk #t1 #t2. Compromise_KEMKey(x_sk) @ #t1 &
+                   Compromise_LTK(c_sk, pkC) @t2
+     "
+
+#endif
+
+end
