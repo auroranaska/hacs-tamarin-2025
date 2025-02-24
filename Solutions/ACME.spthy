@@ -2,8 +2,11 @@ theory ACME
 begin
 
 builtins: signing, asymmetric-encryption
+
+#ifdef deo
 functions: deo_pk/2
 equations: verify(sig, m, deo_pk(m, sig)) = true
+#endif
 
 /* This is a restriction that ensures in any rule with the Eq(x,y) action, the terms
 matched by the variables x and y are the same. The modeler can then add an Eq action to 
@@ -16,7 +19,7 @@ restriction Eq:
 rule Client_Init:
   [ Fr(~sk) ]
   --[ ClientInitMessage(),
-     OwnerClaimedAdress($Adr, pk(~sk))]->
+     OwnerClaimedAddress($Adr, pk(~sk))]->
   [ Out(<$Adr>), StateC(~sk, $C, $Adr) ]
 
 rule LetsEncrypt_Server_Init:
@@ -50,12 +53,12 @@ rule DNS_Attacker_Query:
   [ Out(signature) ]
 
 rule LetsEncrypt_Server_Verif:
-  [ In(pk_AC),
+  [ In(o_pk),
     !RegisteredAdr($Adr, signature),
     StateLE(~token, $Adr)
    ]
-  --[ AcceptedAdress($Adr, pk_AC),
-      Eq(verify(signature,~token, pk_AC), true)
+  --[ AcceptedAddress($Adr, o_pk),
+      Eq(verify(signature,~token, o_pk), true)
       ]->
   [ Out('Approved') ]
 
@@ -71,15 +74,15 @@ lemma ExecutabilityLE:
 
 lemma ExecutabilityLEEnd:
   exists-trace
-  "Ex A s #i. AcceptedAdress(A, s) @ #i"
+  "Ex A s #i. AcceptedAddress(A, s) @ #i"
 
 
-// Server Authentication at the end of the protocol
-lemma ServerAuthentication:
-  "All Adr pk_AC #i. 
-   AcceptedAdress(Adr, pk_AC) @ #i 
+// Authentication of Owner
+lemma OwnerAuthentication:
+  "All Adr o_pk #i. 
+   AcceptedAddress(Adr, o_pk) @ #i 
    ==>  
-      (Ex #j. j<i & OwnerClaimedAdress(Adr, pk_AC) @ #j)
+      (Ex #j. j<i & OwnerClaimedAddress(Adr, o_pk) @ #j)
     "
 
 end

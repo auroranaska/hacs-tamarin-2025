@@ -68,9 +68,9 @@ rule Client_Accepts:
   [ ]
 
 //Attacker learns the server's long-term key
-rule Reveal_LTK:
+rule Compromise_LTK:
   [ !Ltk($S, ~sk)]
-  --[RevealLtk($S, ~sk)]->
+  --[CompromiseLtk($S, ~sk)]->
   [ Out(~sk) ]
 
 // Sanity Traces to check executability of the model
@@ -98,13 +98,13 @@ lemma BothPartiesCanReachEnd:
 lemma ServerKeySecrecy:
   "All S key #i. SecretServer(S, key) @ #i 
   ==> (not Ex #j. K(key) @ #j)
-    | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
+    | (Ex s_sk #j. CompromiseLtk(S, s_sk)@ #j)"
 
 // Verifies True.
 lemma ClientKeySecrecy:
   "All S key #i. SecretClient(S, key) @ #i 
   ==> (not Ex #j. K(key) @ #j)
-    | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
+    | (Ex s_sk #j. CompromiseLtk(S, s_sk)@ #j)"
 
 // Server Authentication at the end of the protocol
 lemma ServerAuthentication:
@@ -112,6 +112,6 @@ lemma ServerAuthentication:
    ClientAccepts(S, x_pk, y_pk, s_pk, auth, key) @ #i 
    ==>  
       (Ex #j. j<i & ServerAccepts(S, x_pk, y_pk, s_pk, auth, key) @ #j)
-    | (Ex s_sk #j. RevealLtk(S, s_sk)@ #j)"
+    | (Ex s_sk #j. CompromiseLtk(S, s_sk)@ #j)"
 
 end
